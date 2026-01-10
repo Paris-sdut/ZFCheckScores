@@ -10,6 +10,7 @@ import requests
 import rsa
 from pyquery import PyQuery as pq
 from requests import exceptions
+from datetime import datetime
 
 RASPIANIE = [
     ["8:00", "8:40"],
@@ -382,30 +383,45 @@ class Client:
             traceback.print_exc()
             return {"code": 999, "msg": "获取个人信息时未记录的错误：" + str(e)}
 
-    def get_grade(self, year: int = 0, term: int = 0, use_personal_info: bool = False):
+    def get_grade(self, use_personal_info: bool = False):
         """
-        获取成绩
+        获取成绩，学年和学期自动判断
         use_personal_info: 是否使用获取个人信息接口获取成绩
         """
         url = urljoin(
             self.base_url,
-            ("cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005" if use_personal_info else "cjcx/cjcx_cxXsgrcj.html?doType=query&gnmkdm=N305005"),
+            "cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005" if use_personal_info else "cjcx/cjcx_cxXsgrcj.html?doType=query&gnmkdm=N305005",
         )
-        temp_term = term
-        term = term**2 * 3
-        year = "" if year == 0 else year
-        term = "" if term == 0 else term
+
+        now = datetime.now()
+        year = now.year
+        month = now.month
+
+        # 自动判断学年和学期
+        if month < 3:  # 1~2月，上一学年第一学期
+            year -= 1
+            term_num = 1
+        elif month < 9:  # 3~8月，上一学年第二学期
+            year -= 1
+            term_num = 2
+        else:  # 9~12月，本学年第一学期
+            term_num = 1
+
+        term_map = {1: 3, 2: 12}
+        term = term_map[term_num]
+
         data = {
-            "xnm": str(year),  # 学年数
-            "xqm": str(term),  # 学期数，第一学期为3，第二学期为12, 整个学年为空''
+            "xnm": str(year),
+            "xqm": term,
             "_search": "false",
             "nd": int(time.time() * 1000),
-            "queryModel.showCount": "100",  # 每页最多条数
+            "queryModel.showCount": "100",
             "queryModel.currentPage": "1",
             "queryModel.sortName": "",
             "queryModel.sortOrder": "asc",
-            "time": "0",  # 查询次数
+            "time": "0",
         }
+
         try:
             req_grade = self.sess.post(
                 url,
@@ -416,18 +432,21 @@ class Client:
             )
             if req_grade.status_code != 200:
                 return {"code": 2333, "msg": "教务系统挂了"}
+
             doc = pq(req_grade.text)
             if doc("h5").text() == "用户登录":
                 return {"code": 1006, "msg": "未登录或已过期，请重新登录"}
+
             grade = req_grade.json()
             grade_items = grade.get("items")
             if not grade_items:
                 return {"code": 1005, "msg": "获取内容为空"}
+
             result = {
                 "sid": grade_items[0]["xh"],
                 "name": grade_items[0]["xm"],
                 "year": year,
-                "term": temp_term,
+                "term": term_num,
                 "count": len(grade_items),
                 "courses": [
                     {
@@ -447,21 +466,16 @@ class Client:
                 ],
             }
             return {"code": 1000, "msg": "获取成绩成功", "data": result}
+
         except exceptions.Timeout:
             return {"code": 1003, "msg": "获取成绩超时"}
-        except (
-            exceptions.RequestException,
-            json.decoder.JSONDecodeError,
-            AttributeError,
-        ):
+        except (exceptions.RequestException, json.decoder.JSONDecodeError, AttributeError):
             traceback.print_exc()
-            return {
-                "code": 2333,
-                "msg": "请重试，若多次失败可能是系统错误维护或需更新接口",
-            }
+            return {"code": 2333, "msg": "请重试，若多次失败可能是系统错误维护或需更新接口"}
         except Exception as e:
             traceback.print_exc()
             return {"code": 999, "msg": "获取成绩时未记录的错误：" + str(e)}
+
 
     def get_schedule(self, year: int, term: int):
         """获取课程表信息"""
@@ -871,20 +885,31 @@ class Client:
             traceback.print_exc()
             return {"code": 999, "msg": "获取消息时未记录的错误：" + str(e)}
 
-    def get_selected_courses(self, year: int = 0, term: int = 0):
-        """获取已选课程信息"""
+    def get_selected_courses(self):
+        """获取已选课程信息，自动判断学年学期"""
         try:
-            url = urljoin(
-                self.base_url,
-                "xsxxxggl/xsxxwh_cxXsxkxx.html?gnmkdm=N100801",
-            )
-            temp_term = term
-            term = term**2 * 3
-            year = "" if year == 0 else year
-            term = "" if term == 0 else term
+            url = urljoin(self.base_url, "xsxxxggl/xsxxwh_cxXsxkxx.html?gnmkdm=N100801")
+
+            now = datetime.now()
+            year = now.year
+            month = now.month
+
+            # 自动判断学年和学期
+            if month < 3:  # 1~2月，上一学年第一学期
+                year -= 1
+                term_num = 1
+            elif month < 9:  # 3~8月，上一学年第二学期
+                year -= 1
+                term_num = 2
+            else:  # 9~12月，本学年第一学期
+                term_num = 1
+
+            term_map = {1: 3, 2: 12}
+            term = term_map[term_num]
+
             data = {
                 "xnm": str(year),
-                "xqm": str(term),
+                "xqm": term,
                 "_search": "false",
                 "queryModel.showCount": 5000,
                 "queryModel.currentPage": 1,
@@ -892,6 +917,7 @@ class Client:
                 "queryModel.sortOrder": "asc",
                 "time": 1,
             }
+
             req_selected = self.sess.post(
                 url,
                 data=data,
@@ -899,34 +925,42 @@ class Client:
                 cookies=self.cookies,
                 timeout=self.timeout,
             )
+
             if req_selected.status_code != 200:
                 return {"code": 2333, "msg": "教务系统挂了"}
+
             doc = pq(req_selected.text)
             if doc("h5").text() == "用户登录":
                 return {"code": 1006, "msg": "未登录或已过期，请重新登录"}
+
             selected = req_selected.json()
             result = {
                 "year": year,
-                "term": temp_term,
-                "count": len(selected),
-                "courses": [{"class_id": i.get("jxb_id"), "class_name": i.get("jxbmc"), "title": i.get("kcmc"), "teacher": i.get("jsxm"), "course_year": i.get("xnmc"), "course_semester": i.get("xqmmc")} for i in selected["items"]],
+                "term": term_num,
+                "count": len(selected.get("items", [])),
+                "courses": [
+                    {
+                        "class_id": i.get("jxb_id"),
+                        "class_name": i.get("jxbmc"),
+                        "title": i.get("kcmc"),
+                        "teacher": i.get("jsxm"),
+                        "course_year": i.get("xnmc"),
+                        "course_semester": i.get("xqmmc")
+                    }
+                    for i in selected.get("items", [])
+                ],
             }
             return {"code": 1000, "msg": "获取已选课程成功", "data": result}
+
         except exceptions.Timeout:
             return {"code": 1003, "msg": "获取已选课程超时"}
-        except (
-            exceptions.RequestException,
-            json.decoder.JSONDecodeError,
-            AttributeError,
-        ):
+        except (exceptions.RequestException, json.decoder.JSONDecodeError, AttributeError):
             traceback.print_exc()
-            return {
-                "code": 2333,
-                "msg": "请重试，若多次失败可能是系统错误维护或需更新接口",
-            }
+            return {"code": 2333, "msg": "请重试，若多次失败可能是系统错误维护或需更新接口"}
         except Exception as e:
             traceback.print_exc()
             return {"code": 999, "msg": f"获取已选课程时未记录的错误：{str(e)}"}
+
 
     def get_block_courses(self, year: int, term: int, block: int):
         """获取板块课选课列表"""

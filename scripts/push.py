@@ -1,17 +1,12 @@
 import requests
 import json
 import re
-from scripts.ad import get_advertise
 
 
 # 定义函数send_message，用于发送消息
 def send_message(token, title, content):
     # 推送消息的url，格式化字符串以包含token
     url = f"https://push.showdoc.com.cn/server/api/push/{token}"
-    # 调用get_advertise函数获取广告内容
-    advertise = get_advertise()
-    # 如果广告内容不为空，则将广告内容添加到消息内容前
-    content = f"{advertise}{content}" if advertise else content
     # 定义正则表达式模式，用于匹配包含“教学班ID”的行
     pattern = re.compile(r"^.*教学班ID.*$\n?", re.MULTILINE)
     # 使用正则表达式替换匹配的行为空字符串，并去除前后的空白字符
@@ -23,7 +18,7 @@ def send_message(token, title, content):
         "成绩信息：": "<h1>成绩信息</h1>\n",  # 替换“成绩信息：”为HTML标题标签
         "未公布成绩的课程：": "<h1>未公布成绩的课程</h1>\n",  # 替换“未公布成绩的课程：”为HTML标题标签
         "工作流信息：": "<h1>工作流信息</h1>\n",  # 替换“工作流信息：”为HTML标题标签
-        "Copyright © 2024 NianBroken. All rights reserved.": "Copyright © 2024 <a href='https://www.klaio.top/' target='_blank'>NianBroken</a>. All rights reserved.",  # 替换版权信息为带有超链接的HTML
+        "Copyright © 2026 NianBroken. All rights reserved.": "Copyright © 2026 <a href='https://www.coolarec.link/' target='_blank'>CoolArec</a>. All rights reserved.",  # 替换版权信息为带有超链接的HTML
     }
     # 遍历字典中的所有键值对，进行替换操作
     for old, new in replacements.items():
